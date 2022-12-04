@@ -1,0 +1,1215 @@
+---
+title: "MATH7635-HOMEWORK-III"
+author: "Alexander M. Carnall"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+### CHAPTER 05 PROBLEMS
+
+## Question 01 (Page 219): 
+
+Using basic statistical properties of the variance, as well as single-variable calculus, derive (5.6). In other words, prove that $\alpha$ given by (5.6) does indeed minimize $Var(\alpha X + (1 - \alpha) Y)$.
+
+Equation 5.6 gives $\alpha = \frac{\sigma_Y^2 - \sigma_{XY}}{\sigma_X^2 + \sigma_Y^2 - 2\sigma_{XY}}$
+
+$Var(\alpha X + (1 - \alpha) Y) = \alpha^2Var(X) + (1 - \alpha)^2Var(Y) + 2\alpha(1 - \alpha)Cov(X,Y)$
+
+$2\alpha Var(X) - 2(1 - \alpha)VarY + 2(1 - 2\alpha)Cov(X, Y) = 0$
+
+$\alpha [Var(X) + Var(Y) - 2Cov(X, Y)] = Var(Y) - Cov(X, Y)$
+
+$\alpha = \frac{Var(Y) - Cov(X, Y)}{Var(X) + Var(Y) - 2Cov(X, Y)} = \frac{\sigma_Y^2 - \sigma_{XY}}{\sigma_X^2 + \sigma_Y^2 - 2\sigma_{XY}}$
+
+## Question 02 (Page 219/220):
+
+We will now derive the probability that a given observation is part of a bootstrap sample. Suppose that we obtain a bootstrap sample from a set of n observations. 
+
+(a) What is the joint probability that the first bootstrap observation is not the jth observation from the original sample? Justify your answer.
+
+In bootstrap sampling, there is equal probability that any observation is selected as the first bootstrap observation is $\frac{1}{n}$. The probability then that the jth observation is not the first bootstrap observation is $1 - \frac{1}{n}$
+
+(b) What is the probability that the second bootstrap observation is not the jth observation from the original sample?
+
+Because bootstrap sampling is performed with replacement, the probability is unchanged (i.e., $1 - \frac{1}{n}$)
+
+(c) Argue that the probability that the jth observation is not in the bootstrap sample is $(1 - 1/n)^n$.
+
+As each observation in the bootstrap sample has independent $\frac{1}{n}$ probability of being selected, $(1 - 1/n)^n$ gives the product of independent probabilities among all observations.
+
+(d) When n = 5, what is the probability that the jth observation is in the bootstrap sample?
+
+If the above describes the probability of the observation not being in the bootstrap sample, then the probability of being in the sample is $1 - (1 - \frac{1}{n})^n$. So for n = 5, this is $1 - (1 - \frac{1}{5})^5$, giving ~67%:
+
+```{r}
+
+1 - (1 - 1/5)^5
+
+```
+
+(e) When n = 100, what is the probability that the jth observation is in the bootstrap sample?
+
+Following the same method as above (i.e., $1 - (1 - \frac{1}{100})^100$), it will be ~63%
+
+```{r}
+
+1 - (1 - 1/100)^100
+
+```
+
+(f) When n = 10,000, what is the probability that the jth observation is in the bootstrap sample?
+
+Following the same method as above (i.e., $1 - (1 - \frac{1}{10000})^10000$), it will again be ~63%
+
+```{r}
+
+1 - (1 - 1/10000)^10000
+
+```
+
+(g) Create a plot that displays, for each integer value of n from 1 to 100,000, the probability that the jth observation is in the bootstrap sample. Comment on what you observe. 
+
+```{r}
+
+xval = 100000
+prob = c()
+
+for (int in 1:xval) {
+  prob[int] = 1 - (1 - 1 / int)^int
+}
+
+plot(1:xval, prob, main = 'Probability that observation j is in bootstrap sample', 
+     xlab = 'n', ylab = 'Probability')
+
+```
+
+I will spare the space of printing out the 'prob' object, but the probabilities rapidly reach an asymptote around 63.2%
+
+(h) We will now investigate numerically the probability that a bootstrap sample of size n = 100 contains the jth observation. Here j = 4. We repeatedly create bootstrap samples, and each time we record whether or not the fourth observation is contained in the bootstrap sample (see text). Comment on the results obtained.
+
+```{r}
+
+set.seed(4)
+
+store <- rep(NA, 10000)
+
+for(i in 1:10000){
+  store[i] <- sum(sample (1:100 , rep=TRUE) == 4) > 0
+}
+
+mean(store)
+
+```
+This agrees well with the previously performed demonstrations wherein the jth (in this case 4th) sample appears in the randomly generated samples about 62.74% of the time, very close to the estimates derived above.
+
+## Question 04 (Page 220): 
+
+Suppose that we use some statistical learning method to make a prediction for the response Y for a particular value of the predictor X. Carefully describe how we might estimate the standard deviation of our prediction.
+
+The bootstrap is the appropriate tool for the job. The bootstrap is a method for quantifying the uncertainty around parameter estimate(s), and is executed by re-sampling the data with replacement. This means that from hypothetical data set $Z$ of size $n$, $B$ new data sets $Z^{*B}$ are drawn from $Z$ with equal $n$ such that each $Z^{*B}$ may contain unique new combinations of observations (including repeated appearance of some observations), that may be used for training statistical learning models. The parameter estimates are computed for each model, and their standard error is given by equation 5.8 on page 211. Based on this, we can also produce confidence intervals for these parameters. 
+
+## Question 05 (Page 220/221:
+
+In Chapter 4, we used logistic regression to predict the probability of default using income and balance on the Default data set. We will now estimate the test error of this logistic regression model using the validation set approach. Do not forget to set a random seed before beginning your analysis.
+
+(a) Fit a logistic regression model that uses income and balance to predict default.
+
+```{r}
+
+library(ISLR2)
+?Default
+
+dfltLR = glm(default ~ income + balance, family = 'binomial', data = Default)
+summary(dfltLR)
+
+```
+
+(b) Using the validation set approach, estimate the test error of this model. In order to do this, you must perform the following steps:
+i. Split the sample set into a training set and a validation set.
+ii. Fit a multiple logistic regression model using only the training observations.
+iii. Obtain a prediction of default status for each individual in the validation set by computing the posterior probability of default for that individual, and classifying the individual to the default category if the posterior probability is greater than 0.5.
+iv. Compute the validation set error, which is the fraction of the observations in the validation set that are misclassified.
+
+```{r}
+
+# part i
+
+set.seed(2022)
+
+trainInd = sample(nrow(Default), 0.80 * nrow(Default), replace = FALSE)
+defTrain = Default[trainInd, ]
+defTest = Default[-trainInd, ]
+
+# part ii
+
+dfltLR2 = glm(default ~ income + balance, family = 'binomial', data = defTrain)
+summary(dfltLR2)
+
+# part iii
+
+dflt2Pred = predict(dfltLR2, defTest, type = 'response')
+dflt2Labs = rep('No', nrow(defTest))
+dflt2Labs[dflt2Pred > 0.5] = 'Yes'
+
+# part iv
+
+dflt2Table = table(dflt2Labs, defTest$default)
+print(dflt2Table)
+1 - (sum(diag(dflt2Table)) / sum(dflt2Table))
+
+```
+
+(c) Repeat the process in (b) three times, using three different splits of the observations into a training set and a validation set. Comment on the results obtained.
+
+
+```{r}
+
+set.seed(2022)
+
+defaultError = c()
+
+for (i in 1:3){
+  
+  trainInd2 = sample(nrow(Default), 0.80 * nrow(Default), replace = FALSE)
+  defTrain2 = Default[trainInd2, ]
+  defTest2 = Default[-trainInd2, ]
+  
+  dfltLR3 = glm(default ~ income + balance, family = 'binomial', data = defTrain2)
+  
+  dflt3Pred = predict(dfltLR3, defTest2, type = 'response')
+  dflt3Labs = rep('No', nrow(defTest2))
+  dflt3Labs[dflt3Pred > 0.5] = 'Yes'
+  
+  dflt3Table = table(dflt3Labs, defTest2$default)
+  testError = 1 - (sum(diag(dflt3Table)) / sum(dflt3Table))
+  defaultError[i] = testError
+  
+}
+
+print(defaultError)
+mean(defaultError)
+
+```
+
+The test error across three unique splits of equal size are quite comparable, 0.0265, 0.0370, 0.0255 (mean of 0.0296), and compare reasonably well to that achieved in part iv. 
+
+(d) Now consider a logistic regression model that predicts the probability of default using income, balance, and a dummy variable for student. Estimate the test error for this model using the validation set approach. Comment on whether or not including a dummy variable for student leads to a reduction in the test error rate.
+
+```{r}
+
+set.seed(2022)
+
+trainInd3 = sample(nrow(Default), 0.8 * nrow(Default), replace = FALSE)
+defTrain3 = Default[trainInd3, ]
+defTest3 = Default[-trainInd3, ]
+
+dfltLR4 = glm(default ~ income + balance + student, family = 'binomial', data = defTrain3)
+summary(dfltLR4)
+
+dflt4Pred = predict(dfltLR4, defTest3, type = 'response')
+dflt4Labs = rep('No', nrow(defTest3))
+dflt4Labs[dflt4Pred > 0.5] = 'Yes'
+
+dflt4Table = table(dflt4Labs, defTest3$default)
+dflt4Error = 1 - (sum(diag(dflt4Table)) / sum(dflt4Table))
+print(dflt4Error)
+
+```
+
+The addition of the student dummy variable had an effect on the model coefficients, making 'income' no longer a significant predictor. This implies as we saw earlier that there is some correlation between these predictors which can have the effect of inflating the standard error term (thus decreasing z-value). The result on test error however is only marginally affected in this single run, producing a test error rate of 2.8% which is actually slightly lower than that achieved in the previous trial(s) - the mean of which was around 3%.
+
+## Question 06 (Page 221):
+
+We continue to consider the use of a logistic regression model to predict the probability of default using income and balance on the Default data set. In particular, we will now compute estimates for the standard errors of the income and balance logistic regression coefficients in two different ways: (1) using the bootstrap, and (2) using the standard formula for computing the standard errors in the glm() function. Do not forget to set a random seed before beginning your analysis.
+
+(a) Using the summary() and glm() functions, determine the estimated standard errors for the coefficients associated with income and balance in a multiple logistic regression model that uses both predictors.
+
+```{r}
+
+set.seed(2022)
+
+dfltLR5 = glm(default ~ income + balance, family = 'binomial', data = Default)
+dfltLR5Summary = summary(dfltLR5)
+
+
+#The standard errors associated with the coefficient estimates for income and balance are:
+
+dfltLR5Summary$coefficients[2:3, 2]
+
+
+```
+
+(b) Write a function, boot.fn(), that takes as input the Default data set as well as an index of the observations, and that outputs the coefficient estimates for income and balance in the multiple logistic regression model.
+
+```{r}
+
+#Based on the example given on page 217
+
+set.seed(2022)
+
+boot.fn = function(data, index) {
+  
+  coef(glm(default ~ income + balance, family = 'binomial', data = data, subset = index))[2:3]
+  
+}
+
+boot.fn(Default, 1:nrow(Default))
+
+
+```
+
+(c) Use the boot() function together with your boot.fn() function to estimate the standard errors of the logistic regression coefficients for income and balance.
+
+```{r}
+
+#Based on the example given on page 218
+
+library(boot)
+
+set.seed(2022)
+
+bootCoef = boot(data = Default, statistic = boot.fn, R = 1000)
+bootCoef
+
+```
+
+(d) Comment on the estimated standard errors obtained using the glm() function and using your bootstrap function.
+
+
+The coefficient standard errors are very similar: 
+
+From glm() function:
+
+SE(Income):  4.985167e-06
+SE(Balance): 2.273731e-04
+
+From bootstrap function:
+
+SE(Income):  4.888646e-06
+SE(Balance): 2.249716e-04
+
+  
+## Question 07 (Page 222): 
+
+In Sections 5.3.2 and 5.3.3, we saw that the cv.glm() function can be used in order to compute the LOOCV test error estimate. Alternatively, one could compute those quantities using just the glm() and predict.glm() functions, and a for loop. You will now take this approach in order to compute the LOOCV error for a simple logistic regression model on the Weekly data set. Recall that in the context of classification problems, the LOOCV error is given in (5.4).
+
+(a) Fit a logistic regression model that predicts Direction using Lag1 and Lag2.
+
+```{r}
+
+weeklyLR = glm(Direction ~ Lag1 + Lag2, family = 'binomial', data = Weekly)
+summary(weeklyLR)
+
+```
+
+(b) Fit a logistic regression model that predicts Direction using Lag1 and Lag2 using all but the first observation.
+
+```{r}
+
+weeklyLR2 = glm(Direction ~ Lag1 + Lag2, family = 'binomial', data = Weekly[2:nrow(Weekly), ])
+summary(weeklyLR2)
+
+```
+
+(c) Use the model from (b) to predict the direction of the first observation. You can do this by predicting that the first observation will go up if P(Direction = "Up"|Lag1, Lag2) > 0.5. Was this observation correctly classified?
+
+```{r}
+
+firstObs = predict(weeklyLR2, Weekly[1, ], type = 'response')
+firstObs = ifelse(firstObs > 0.5, 'Up', 'Down')
+
+print(paste('The prediction for Direction of observation 1 is: ', firstObs, 
+            ', and the true class label is: ', Weekly$Direction[1], sep = ''))
+
+```
+
+It looks like the first observation is classified as 'Up', but this is not an accurate prediction as the true class label is 'Down'. 
+
+
+(d) Write a for loop from i = 1 to i = n, where n is the number of observations in the data set, that performs each of the following steps:
+
+i. Fit a logistic regression model using all but the ith observation to predict Direction using Lag1 and Lag2.
+ii. Compute the posterior probability of the market moving up for the ith observation.
+iii. Use the posterior probability for the ith observation in order to predict whether or not the market moves up.
+iv. Determine whether or not an error was made in predicting the direction for the ith observation. If an error was made, then indicate this as a 1, and otherwise indicate it as a 0.
+
+```{r}
+
+error = c()
+
+for (obs in 1:nrow(Weekly)) {
+  
+  obsLR = glm(Direction ~ Lag1 + Lag2, family = 'binomial', data = Weekly[-obs, ])
+  obsPR = predict(obsLR, Weekly[obs, ], type = 'response')
+  obsPR = ifelse(obsPR > 0.5, 'Up', 'Down')
+  
+  error[obs] = ifelse(obsPR == Weekly$Direction[obs], 1, 0)
+  
+}
+
+error
+
+```
+
+(e) Take the average of the n numbers obtained in (d)iv in order to obtain the LOOCV estimate for the test error. Comment on the results.
+
+```{r}
+
+round(1 - mean(error), 2)
+
+```
+
+The test error rate for the LOOCV on the Weekly dataset performed in (d) is 0.45. This performs worse than a no-information classifier. Actually, the previous classifier in part (d) could have been outperformed by strictly guessing the majority class ('Up') in every case based on the table below:
+
+```{r}
+
+round(prop.table(table(Weekly$Direction)), 2)
+
+```
+
+## Question 08 (Page 222/223):
+
+We will now perform cross-validation on a simulated data set.
+
+(a) Generate a simulated data set as follows:
+set.seed (1)
+x <- rnorm (100)
+y <- x - 2 * x^2 + rnorm (100)
+
+In this data set, what is n and what is p? Write out the model used to generate the data in equation form.
+
+```{r}
+
+set.seed(1)
+
+x = rnorm(100)
+y = x - 2 * x^2 + rnorm(100)
+
+```
+
+In this data set, n = 100 (observations) and p = 2 (predictors, $X$ and $2X^2$) which is obviated by the model expression in equation form: 
+
+$Y = X - 2X^2 + \epsilon$
+
+
+(b) Create a scatterplot of X against Y. Comment on what you find.
+
+```{r}
+
+plot(x, y)
+
+```
+
+The data produce an upside down quadratic relationship, which is expected given the presence of a negative squared term $(-2X^2)$ in the function
+
+
+(c) Set a random seed, and then compute the LOOCV errors that result from fitting the following four models using least squares:
+
+Note you may find it helpful to use the data.frame() function to create a single data set containing both X and Y.
+
+```{r}
+
+xyData = data.frame(x, y)
+
+```
+
+Following the recommendation to use the glm() function and cv.glm() functions in 5.3.2 (Page 214). In these cases, the two error terms associated with the cv.glm() function $delta call are expected to be the same to two decimal places, but when they are performed with K-fold CV, the first number 'delta' corresponds to the standard K-fold CV estimate, but the second is bias-corrected. The boot library was loaded earlier in question 06(c).
+
+i. $Y = \beta_0 + \beta_1X + \epsilon$
+
+```{r}
+
+set.seed(1)
+
+glm.i = glm(y ~ x, data = xyData)
+cverr.i = cv.glm(xyData, glm.i)
+cverr.i$delta[1]
+
+```
+
+ii. $Y = \beta_0 + \beta_1X + \beta_2X^2 + \epsilon$
+
+```{r}
+
+set.seed(1)
+
+glm.ii = glm(y ~ poly(x, 2), data = xyData)
+cverr.ii = cv.glm(xyData, glm.ii)
+cverr.ii$delta[1]
+
+```
+
+iii. $Y = \beta_0 + \beta_1X + \beta_2X^2 + \beta_3X^3 + \epsilon$
+
+```{r}
+
+set.seed(1)
+
+glm.iii = glm(y ~ poly(x, 3), data = xyData)
+cverr.iii = cv.glm(xyData, glm.iii)
+cverr.iii$delta[1]
+
+```
+
+iv. $Y = \beta_0 + \beta_1X + \beta_2X^2 + \beta_3X^3 + \beta_4X^4 + \epsilon$
+
+```{r}
+
+set.seed(1)
+
+glm.iv = glm(y ~ poly(x, 4), data = xyData)
+cverr.iv = cv.glm(xyData, glm.iv)
+cverr.iv$delta[1]
+
+```
+
+(d) Repeat (c) using another random seed, and report your results. Are your results the same as what you got in (c)? Why?
+
+i. $Y = \beta_0 + \beta_1X + \epsilon$
+
+```{r}
+
+set.seed(2)
+
+glm.i = glm(y ~ x, data = xyData)
+cverr.i = cv.glm(xyData, glm.i)
+cverr.i$delta[1]
+
+```
+
+ii. $Y = \beta_0 + \beta_1X + \beta_2X^2 + \epsilon$
+
+```{r}
+
+set.seed(2)
+
+glm.ii = glm(y ~ poly(x, 2), data = xyData)
+cverr.ii = cv.glm(xyData, glm.ii)
+cverr.ii$delta[1]
+
+```
+
+iii. $Y = \beta_0 + \beta_1X + \beta_2X^2 + \beta_3X^3 + \epsilon$
+
+```{r}
+
+set.seed(2)
+
+glm.iii = glm(y ~ poly(x, 3), data = xyData)
+cverr.iii = cv.glm(xyData, glm.iii)
+cverr.iii$delta[1]
+
+```
+
+iv. $Y = \beta_0 + \beta_1X + \beta_2X^2 + \beta_3X^3 + \beta_4X^4 + \epsilon$
+
+```{r}
+
+set.seed(2)
+
+glm.iv = glm(y ~ poly(x, 4), data = xyData)
+cverr.iv = cv.glm(xyData, glm.iv)
+cverr.iv$delta[1]
+
+```
+
+Yes, the LOOCV error is identical when using random seed == 1 or random seed == 2. This is because there is ultimately no difference in the sampling approach. In both cases, each individual data point serves as the test observation at some point in the process. If these were different random seeds and we were performing a different resampling method (e.g., k-fold CV, bootstrapping) different observations could be included in the folds/bootstrap samples, which could lead to different results. 
+
+
+(e) Which of the models in (c) had the smallest LOOCV error? Is this what you expected? Explain your answer.
+
+The quadratic fit had the smallest LOOCV error. This was appreciably better than the MSE achieved with the linear fit. After that, there is not much noticeable difference in the error terms (i.e., from quadratic to 3rd and 4th order polynomials). This agrees with expectation because as pointed out in part (b), the data have a clear negative quadratic pattern which means the model with the quadratic term should be the best approximation of its true form.
+
+
+(f) Comment on the statistical significance of the coefficient estimates that results from fitting each of the models in (c) using least squares. Do these results agree with the conclusions drawn based on the cross-validation results?
+
+```{r}
+
+summary(glm.i)$coefficients
+summary(glm.ii)$coefficients
+summary(glm.iii)$coefficients
+summary(glm.iv)$coefficients
+
+```
+
+Confirming that the addition of higher order polynomials (beyond the quadratic fit) does not contribute to appreciable improvements in the LOOCV, the added variables of third and fourth order have non-significant coefficient estimates. 
+
+
+### CHAPTER 06 PROBLEMS
+
+
+## Question 01 (Page 282/283): 
+
+1. We perform best subset, forward stepwise, and backward stepwise selection on a single data set. For each approach, we obtain p + 1 models, containing 0, 1, 2, . . ., p predictors. Explain your answers:
+
+(a) Which of the three models with k predictors has the smallest training RSS?
+
+Except for the null model, and the model containing p predictors, best subset will produce the lowest training RSS of these methods. This is because at each model size (i.e., $M_0$m $M_1$, ..., $M_p$), best subset minimizes RSS based on the optimal combination of variables (including that which involves changing $X_1$), while forward selection only adds the most relevant variable to the existing model, and backward selection only removes the least relevant variable from the existing model, while previously added or removed variables remain fixed. 
+
+(b) Which of the three models with k predictors has the smallest test RSS?
+
+There are no guarantees, here. The model using best subset selection is MORE likely to produce a model with lower test RSS because at each model size (again, $M_0$m $M_1$, ..., $M_p$), forward and backward stepwise selection will search through a smaller space of possible models than best subset. By chance, either forward or backward stepwise could produce models with lower test RSS, but it is less likely than for best subset.
+
+(c) True or False:
+
+i. The predictors in the k-variable model identified by forward stepwise are a subset of the predictors in the (k+1)-variable model identified by forward stepwise selection.
+
+TRUE - best subset will consider all possible models of size k including that at the current model size for forward stepwise. 
+
+ii. The predictors in the k-variable model identified by backward stepwise are a subset of the predictors in the (k + 1)-variable model identified by backward stepwise selection.
+
+TRUE - best subset will consider all possible models of size k including that at the current model size for backward stepwise. 
+
+iii. The predictors in the k-variable model identified by backward stepwise are a subset of the predictors in the (k + 1)-variable model identified by forward stepwise selection.
+
+FALSE - they both have different starting points. 
+
+iv. The predictors in the k-variable model identified by forward stepwise are a subset of the predictors in the (k+1)-variable model identified by backward stepwise selection.
+
+FALSE - they both have different starting points. 
+
+v. The predictors in the k-variable model identified by best subset are a subset of the predictors in the (k + 1)-variable model identified by best subset selection.
+
+FALSE - this is descriptive of forward stepwise.
+
+## Question 02 (Page 283): 
+
+2. For parts (a) through (c), indicate which of i. through iv. is correct. Justify your answer.
+
+I have moved the answer choices here for reference since it will improve clarity for each response: 
+
+i. More flexible and hence will give improved prediction accuracy when its increase in bias is less than its decrease in variance.
+ii. More flexible and hence will give improved prediction accuracy when its increase in variance is less than its decrease in bias.
+iii. Less flexible and hence will give improved prediction accuracy when its increase in bias is less than its decrease in variance.
+iv. Less flexible and hence will give improved prediction accuracy when its increase in variance is less than its decrease in bias.
+
+(a) The lasso, relative to least squares, is:
+
+iii. Less flexible and will improve prediction accuracy when increase in bias is less than decrease in variance. As long as $\lambda > 0$ (otherwise, it is least squares and the comparison would be needless). I chose this because the lasso uses the $\ell_1$ penalty which minimizes the absolute values of the coefficients, inclusive of shrinking them to zero. This inherently increases bias of the model, but at a reduced rate compared to the decrease in variance. 
+
+(b) Repeat (a) for ridge regression relative to least squares.
+
+iii. Less flexible and will improve prediction accuracy when increase in bias is less than decrease in variance. The rationale for this improvement in model performance is identical to that of part (a), except for the $\lambda$ parameter associated with ridge regression. In this case, the $\ell_2$ penalty associated with ridge regression has the effect of shrinking $\beta$ coefficients TOWARD zero, but not actually eliminating predictors. This again has the effect of reducing the variance of the model, but at a greater rate than the associated increase in bias. 
+
+(c) Repeat (a) for non-linear methods relative to least squares.
+
+ii. More flexible and hence will give improved prediction accuracy when its increase in variance is less than its decrease in bias. As we have seen throughout the course, non-linear methods are inherently more flexible allowing for better model fits when the assumptions of either linearity or the additive nature of predictors are not necessarily met. In this way, the flexibility of the model facilitates an increase in variance, potentially allowing a better fit to the true underlying function of the predictor(s)-response relationship, but is optimized when this increase in variance is less than its reduction in bias.
+
+## Question 04 (Page 283): 
+
+4. Suppose we estimate the regression coefficients in a linear regression model by minimizing
+
+$\sum_{i = 1}^n ( y_i - \beta_0 - \sum_{j = 1}^p \beta_jx_{ij})^2 + \lambda\sum_{j = 1}^p\beta_j^2$
+
+for a particular value of $\lambda$. 
+
+For parts (a) through (e), indicate which of i. through v. is correct. Justify your answer.
+
+I have moved the answer choices here for reference since it will improve clarity for each response:
+
+i. Increase initially, and then eventually start decreasing in an inverted U shape.
+ii. Decrease initially, and then eventually start increasing in a U shape.
+iii. Steadily increase.
+iv. Steadily decrease.
+v. Remain constant.
+
+(a) As we increase $\lambda$ from 0, the training RSS will:
+
+iii. Training RSS should be expected to steadily increase as $\lambda$ increases. This is because when $\lambda$ is zero, we have the original least squares model (i.e., there is no shrinkage of coefficients). Consequently, the training RSS will be minimized based on whatever feature selection method was employed, and the model aims to choose beta coefficients that minimize RSS. If $\lambda$ is increased, variance in the model is immediately reduced, and so training RSS can be assumed to increase. 
+
+(b) Repeat (a) for test RSS.
+
+ii. Test RSS should be expected to decrease initially, and then eventually increase creating a U-shape. The initial decease in test RSS is attributable to the decay in model variance, where fewer subtleties in the training data are captured by the coefficient estimates. Eventually, however, the reduction in variance will be overcome by the associated increase in bias due to the construction of an increasingly inflexible model which is then ineffective at capturing the true underlying function present in the predictor-response relationship. 
+
+(c) Repeat (a) for variance.
+
+iv. Variance will steadily decrease as $\lambda$ increases in the above model. Coefficients obtained in the training data reflect full consideration for their respective associations with the response variable, so the full least squares model has greater variance than any model with an associated penalty for large sum of squares for the coefficient estimates. As $\lambda$ increases, coefficient estimates are reduced meaning that the flexibility of the model is decreased. 
+
+(d) Repeat (a) for (squared) bias.
+
+iii. Bias will steadily increase as $\lambda$ increases in the above model. Since the coefficient estimates of the least squares model are reduced by the penalty parameter associated with their $\ell_2$ norm, the model becomes increasingly inflexible and consequently, bias increases. 
+
+(e) Repeat (a) for the irreducible error.
+
+v. The irreducible error is unaffected by the methods used in model construction. It is the inherent variability in the response data. 
+
+## Question 08 (Page 285/286)
+
+8. In this exercise, we will generate simulated data, and will then use this data to perform best subset selection.
+
+(a) Use the rnorm() function to generate a predictor X of length n = 100, as well as a noise vector $\epsilon$ of length n = 100.
+
+```{r}
+
+set.seed(2022)
+
+X = rnorm(100)
+noise = rnorm(100)
+
+```
+
+(b) Generate a response vector Y of length n = 100 according to the model
+
+$Y = \beta_0 + \beta_1X + \beta_2X^2 + \beta_3X^3 + \epsilon ,$
+
+where $\beta_0$, $\beta_1$, $\beta_2$, and $\beta_3$ are constants of your choice.
+
+```{r}
+
+b0 = 2.25
+b1 = 5.50
+b2 = 3.00
+b3 = 0.50
+
+Y = b0 + b1 * X + b2 * X^2 + b3 * X^3 + noise
+
+```
+
+(c) Use the regsubsets() function to perform best subset selection in order to choose the best model containing the predictors X,X2, . . . ,X10. What is the best model obtained according to Cp, BIC, and adjusted R2? Show some plots to provide evidence for your answer, and report the coefficients of the best model obtained. Note you will need to use the data.frame() function to create a single data set containing both X and Y.
+
+```{r}
+
+library(leaps)
+
+q8Data = data.frame(X, Y)
+
+#Passing argument '10' to poly() function based on question.
+
+bSubsets = regsubsets(Y ~ poly(X, 10), data = q8Data, nvmax = 10)
+
+#Following methods used on page 269
+
+bSubsetsSumm = summary(bSubsets)
+
+```
+
+
+```{r}
+
+subsetCP = which.min(bSubsetsSumm$cp)
+subsetBIC = which.min(bSubsetsSumm$bic)
+subsetAdjR2 = which.max(bSubsetsSumm$adjr2)
+
+print('Based on best subset selection, the model with the lowest Cp statistic was model:') 
+
+subsetCP 
+
+print('The model with the lowest BIC statistic was model:') 
+
+subsetBIC 
+
+print('The model with the largest adjusted R² statistic was:') 
+      
+subsetAdjR2
+
+```
+
+```{r}
+
+#Basing plot commands and point identification based on Lecture 21-22 Notes.
+par(mfrow = c(1, 3))
+
+plot(bSubsetsSumm$cp, xlab = 'Number of Predictors', ylab = 'Cp', type = 'l')
+points(which.min(bSubsetsSumm$cp), bSubsetsSumm$cp[which.min(bSubsetsSumm$cp)], 
+       col = 'red', cex = 2, pch = 20)
+
+plot(bSubsetsSumm$bic, xlab = 'Number of Predictors', ylab = 'BIC', type = 'l')
+points(which.min(bSubsetsSumm$bic), bSubsetsSumm$bic[which.min(bSubsetsSumm$bic)], 
+       col = 'red', cex = 2, pch = 20)
+
+plot(bSubsetsSumm$adjr2, xlab = 'Number of Predictors', ylab = 'Adj. R²', type = 'l')
+points(which.max(bSubsetsSumm$adjr2), bSubsetsSumm$adjr2[which.max(bSubsetsSumm$adjr2)],
+       col = 'red', cex = 2, pch = 20)
+
+par(mfrow = c(1, 3))
+
+plot(bSubsets, scale = 'Cp')
+plot(bSubsets, scale = 'bic')
+plot(bSubsets, scale = 'adjr2')
+
+```
+
+```{r}
+
+print('Coefficients associated with best 4-predictor model determined by Cp statistic:')
+coef(bSubsets, which.min(bSubsetsSumm$cp))
+
+print('Coefficients associated with best 3-predictor model determined by BIC statistic:')
+coef(bSubsets, which.min(bSubsetsSumm$bic))
+
+print('Coefficients associated with best 5-predictor model determined by Adjusted R² statistic:')
+coef(bSubsets, which.max(bSubsetsSumm$adjr2))
+
+```
+
+(d) Repeat (c), using forward stepwise selection and also using backwards stepwise selection. How does your answer compare to the results in (c)?
+
+```{r}
+
+fwdSubs = regsubsets(Y ~ poly(X, 10), data = q8Data, nvmax = 10, method = 'forward')
+fwdSubSum = summary(fwdSubs)
+
+bwdSubs = regsubsets(Y ~ poly(X, 10), data = q8Data, nvmax = 10, method = 'backward')
+bwdSubSumm = summary(bwdSubs)
+
+```
+
+```{r}
+
+fwdSubsCP = which.min(fwdSubSum$cp)
+fwdSubsBIC = which.min(fwdSubSum$bic)
+fwdSubsAdjr2 = which.max(fwdSubSum$adjr2)
+
+print('Using forward stepwise selection, the model with the lowest Cp statistic was:')
+
+fwdSubsCP 
+
+print('The model with the lowest BIC statistic was:') 
+
+fwdSubsBIC 
+
+print('The model with the highest Adjusted R² statistic was:')
+
+fwdSubsAdjr2
+
+bwdSubsCP = which.min(bwdSubSumm$cp)
+bwdSubsBIC = which.min(bwdSubSumm$bic)
+bwdSubsAdjr2 = which.max(bwdSubSumm$adjr2)
+
+print('Using backward stepwise selection, the model with the lowest Cp statistic was:')
+
+bwdSubsCP
+
+print('The model with the lowest BIC statistic was:')
+
+bwdSubsBIC
+            
+print('The model with the highest Adjusted R² statistic was:')
+      
+bwdSubsAdjr2
+
+```
+
+```{r}
+
+#Basing plot commands and point identification based on Lecture 21-22 Notes.
+par(mfrow = c(2, 3))
+
+plot(fwdSubSum$cp, xlab = 'Number of Predictors', ylab = 'Forward Selection Cp', type = 'l')
+points(which.min(fwdSubSum$cp), fwdSubSum$cp[which.min(fwdSubSum$cp)], 
+       col = 'red', cex = 2, pch = 20)
+
+plot(fwdSubSum$bic, xlab = 'Number of Predictors', ylab = 'Forward Selection BIC', type = 'l')
+points(which.min(fwdSubSum$bic), fwdSubSum$bic[which.min(fwdSubSum$bic)], 
+       col = 'red', cex = 2, pch = 20)
+
+plot(fwdSubSum$adjr2, xlab = 'Number of Predictors', ylab = 'Forward Selection Adj. R²', type = 'l')
+points(which.max(fwdSubSum$adjr2), fwdSubSum$adjr2[which.max(fwdSubSum$adjr2)], 
+       col = 'red', cex = 2, pch = 20)
+
+#-------------------------------------------------------------------------------------------------------------
+
+plot(bwdSubSumm$cp, xlab = 'Number of Predictors', ylab = 'Backward Selection Cp', type = 'l')
+points(which.min(bwdSubSumm$cp), bwdSubSumm$cp[which.min(bwdSubSumm$cp)], 
+       col = 'red', cex = 2, pch = 20)
+
+plot(bwdSubSumm$bic, xlab = 'Number of Predictors', ylab = 'Backward Selection BIC', type = 'l')
+points(which.min(bwdSubSumm$bic), bwdSubSumm$bic[which.min(bwdSubSumm$bic)], 
+       col = 'red', cex = 2, pch = 20)
+
+plot(bwdSubSumm$adjr2, xlab = 'Number of Predictors', ylab = 'Backward Selection Adj. R²', type = 'l')
+points(which.max(bwdSubSumm$adjr2), bwdSubSumm$adjr2[which.max(bwdSubSumm$adjr2)], 
+       col = 'red', cex = 2, pch = 20)
+
+```
+
+In this case, the results obtained were the same for the number of predictors selected based on each criterion for estimating test error. We can check though, to see if the variables are the same.
+
+```{r}
+
+print('Coefficients for best 4-predictor model based on Cp statistic (forward selection):')
+coef(fwdSubs, which.min(fwdSubSum$cp))
+
+print('Coefficients for best 3-predictor model based on BIC statistic (forward selection):')
+coef(fwdSubs, which.min(fwdSubSum$bic))
+
+print('Coefficients for best 5-predictor model based on Adjusted R² statistic (forward selection):')
+coef(fwdSubs, which.max(fwdSubSum$adjr2))
+
+#----------------------------------------------------------------------------------------------
+
+print('Coefficients for best 4-predictor model based on Cp statistic (backward selection):')
+coef(bwdSubs, which.min(bwdSubSumm$cp))
+
+print('Coefficients for best 3-predictor model based on BIC statistic (backward selection):')
+coef(bwdSubs, which.min(bwdSubSumm$bic))
+
+print('Coefficients for best 5-predictor model based on Adjusted R² statistic (backward selection):')
+coef(bwdSubs, which.max(bwdSubSumm$adjr2))
+
+```
+In this example, it seems as if the model coefficients are also the same.
+
+(e) Now fit a lasso model to the simulated data, again using X,X2,. . . , X10 as predictors. Use cross-validation to select the optimal value of $\lambda$. Create plots of the cross-validation error as a function of $\lambda$. Report the resulting coefficient estimates, and discuss the results obtained.
+
+```{r}
+
+library(glmnet)
+
+set.seed(2022)
+
+xmatx = model.matrix(Y ~ poly(X, 10), data = q8Data)
+lasso = glmnet(xmatx, Y, alpha = 1)
+
+cv.lasso = cv.glmnet(xmatx, Y, alpha = 1)
+bestlam = cv.lasso$lambda.min
+
+plot(cv.lasso)
+```
+
+```{r}
+
+print('The optimal value for lambda chosen by cross-validation was:') 
+      
+round(bestlam, 4)
+            
+print('The obtained coefficient estimates are shown below:')
+
+lasso.fit = glmnet(xmatx, Y, alpha = 1)
+
+lasso.pred = predict(lasso, s = bestlam, type = 'coefficients')
+lasso.pred
+
+```
+
+The best value obtained for $\lambda$ was 0.0631 based on minimization of cross-validation error. The resultant plot agrees with the output of the fitted model above, in which seven variables were chosen. 
+
+(f) Now generate a response vector Y according to the model
+
+$Y = \beta_0 + \beta_7X^7 + \epsilon ,$
+
+and perform best subset selection and the lasso. Discuss the results obtained.
+
+```{r}
+
+b7 = 2.25
+Y2 = b0 + b7 * X^7 + noise
+
+dataF = data.frame(X, Y2)
+
+subsetsF = regsubsets(Y2 ~ poly(X, 10), data = dataF, nvmax = 10)
+summF = summary(subsetsF)
+
+minCP = which.min(summF$cp)
+minBIC = which.min(summF$bic)
+maxR2 = which.max(summF$adjr2)
+
+print('Best model size based on minimum Cp:')
+
+minCP
+
+print('Best model size based on minimum BIC:')
+
+minBIC 
+            
+print('Best model size based on maximum Adj. R²:')
+
+maxR2
+
+par(mfrow = c(1, 3))
+
+plot(summF$cp, xlab = 'Number of Predictors', ylab = 'Cp', type = 'l')
+points(which.min(summF$cp), summF$cp[which.min(summF$cp)], col = 'red', cex = 2, pch = 20)
+
+plot(summF$bic, xlab = 'Number of Predictors', ylab = 'BIC', type = 'l')
+points(which.min(summF$bic), summF$bic[which.min(summF$bic)], col = 'red', cex = 2, pch = 20)
+
+plot(summF$adjr2, xlab = 'Number of Predictors', ylab = 'Adj. R²', type = 'l')
+points(which.max(summF$adjr2), summF$adjr2[which.max(summF$adjr2)], col = 'red', cex = 2, pch = 20)
+
+```
+
+```{r}
+
+print('Coefficients for the 8-variable model, selected by lowest Cp and highest Adjusted R²:')
+coefficients(subsetsF, which.min(summF$cp))
+
+```
+
+```{r}
+
+print('Coefficients for the 7-variable model, selected by lowest BIC:')
+coefficients(subsetsF, which.min(summF$bic))
+
+```
+
+```{r}
+
+xmat2 = model.matrix(Y2 ~ poly(X, 10), data = dataF)
+cv.lasso2 = cv.glmnet(xmat2, Y2, alpha = 1)
+bestlam2 = cv.lasso2$lambda.min
+
+plot(cv.lasso2)
+
+```
+
+```{r}
+
+predict(cv.lasso2, s = bestlam2, type = 'coefficients')
+
+
+```
+
+Far fewer coefficients are included in the lasso model by comparison to those chosen via best subsets with Cp, BIC, and Adjusted R² criteria.
+
+## Question 09 a-d, g (Page 286/287)
+
+9. In this exercise, we will predict the number of applications received using the other variables in the College data set.
+
+(a) Split the data set into a training set and a test set.
+
+```{r}
+
+?College
+
+#I'm going to do a 75-25 train-test split.
+
+set.seed(10)
+
+trainInd = sample(nrow(College), 0.75 * nrow(College), replace = FALSE)
+trainCol = College[trainInd, ]
+testCol = College[-trainInd, ]
+
+```
+
+(b) Fit a linear model using least squares on the training set, and report the test error obtained.
+
+```{r}
+
+lmCol = lm(Apps ~ ., data = trainCol)
+lmPred = predict(lmCol, testCol)
+testRSS = round(mean((lmPred - testCol$Apps)^2), 2)
+
+print(paste('Test RSS: ', testRSS))
+```
+
+(c) Fit a ridge regression model on the training set, with $\lambda$ chosen by cross-validation. Report the test error obtained.
+
+```{r}
+
+x = model.matrix(Apps ~ ., data = College)
+y = College$Apps
+
+grid = 10^seq(10, -2, length = 100)
+ridgeMod = cv.glmnet(x[trainInd, ], y[trainInd], alpha = 0, lambda = grid)
+plot(ridgeMod)
+
+ridgeLam = ridgeMod$lambda.min
+
+ridgePred = predict(ridgeMod, s = ridgeLam, newx = x[-trainInd, ])
+
+ridgeError = round(mean((ridgePred - y[-trainInd])^2), 2)
+
+```
+
+```{r}
+
+print(paste('Test error obtained via least squares: ', testRSS, sep = ''))
+print(paste('Test error obtained via ridge regression: ', ridgeError, sep = ''))
+print(paste('Difference = ', round(testRSS - ridgeError, 2), sep = ''))
+
+```
+Ridge regression provides a trivial improvement over least squares on this dataset. 
+
+(d) Fit a lasso model on the training set, with $\lambda$ chosen by cross validation. Report the test error obtained, along with the number of non-zero coefficient estimates.
+
+```{r}
+
+lassoMod = cv.glmnet(x[trainInd, ], y[trainInd], alpha = 1, lambda = grid)
+plot(lassoMod)
+
+lassoLam = lassoMod$lambda.min
+
+lassoPred = predict(lassoMod, s = lassoLam, newx = x[-trainInd, ])
+
+lassoError = round(mean((lassoPred - y[-trainInd])^2), 2)
+
+```
+
+
+(g) Comment on the results obtained. How accurately can we predict the number of college applications received? Is there much difference among the test errors resulting from these five approaches?
+
+```{r}
+
+print(paste('Test error obtained via least squares: ', testRSS, sep = ''))
+print(paste('Test error obtained via ridge regression: ', ridgeError, sep = ''))
+print(paste('Test error obtained via lasso regression: ', lassoError, sep = ''))
+
+print(paste('Reduction in Test Error (Least Squares - Ridge): ', round(testRSS - ridgeError, 2)))
+print(paste('Reduction in Test Error (Ridge - Lasso): ', round(ridgeError - lassoError, 2)))
+print(paste('Reduction in Test Error (Least Squares - Lasso): ', round(testRSS - lassoError, 2)))
+
+```
+
+```{r}
+
+predict(lassoMod, type = 'coefficients', s = lassoLam)
+
+```
+
+Test errors are listed above in order from smallest to largest improvements, both Ridge and Lasso regression methods improved on the estimates made by least squares, and lasso improved on the estimates made by ridge regression. Unfortunately, the magnitude of improvement in the case of ridge and lasso may be trivial on the whole (~ 1.1%). What is worth noting however, is the reduction in model complexity associated with the lasso regression which used only 14 variables, and following the the one-standard-error-rule it is shown below that the most regularized model within one standard error of the minimum test error only invovles the use of 3 predictors.
+
+```{r}
+
+predict(lassoMod, type = 'coefficients', s = lassoMod$lambda.1se)
+
+```
+
+
+## Question 11 (Page 287/288)
+
+11. We will now try to predict per capita crime rate in the Boston data set.
+
+```{r}
+
+?Boston
+
+set.seed(22)
+
+bosTrain = sample(nrow(Boston), 0.75 * nrow(Boston))
+
+```
+
+(a) Try out some of the regression methods explored in this chapter, such as best subset selection, the lasso, ridge regression, and PCR. Present and discuss results for the approaches that you consider.
+
+Since this is a relatively small dataset (only 12 predictors), best subsets is a computationally feasible method.
+
+```{r}
+
+subsetBos = regsubsets(crim ~ ., data = Boston[bosTrain, ], nvmax = 12)
+summary(subsetBos)
+
+```
+
+First, we will try to get a baseline for test set performance using least squares on each subset of predictors. Because the cv.glmnet() function has a default parameter for 10-fold CV, we will mimic that with least squares
+
+```{r}
+
+#Following the example on page 272
+
+set.seed(55)
+
+predict.regsubsets = function(object, newdata, id, ...) {
+  form = as.formula(object$call[[2]])
+  mat = model.matrix(form, newdata)
+  coefi = coef(object, id = id)
+  xvars = names(coefi)
+  mat[, xvars] %*% coefi
+}
+
+k = 10
+n = nrow(Boston)
+p = ncol(Boston) - 1
+
+folds = sample(rep(1:k, length = n))
+cv.errors = matrix(NA, k, p, dimnames = list(NULL, 1:p))
+
+for (j in 1:k) {
+  best.fit = regsubsets(crim ~ ., data = Boston[folds != j, ], nvmax = p)
+  
+  for (i in 1:p) {
+    pred = predict(best.fit, Boston[folds == j, ], id = i)
+    cv.errors[j, i] = mean((Boston$crim[folds == j] - pred)^2)
+  }
+}
+
+mean.cv.errors = apply(cv.errors, 2, mean)
+plot(mean.cv.errors, type = 'b', ylab = 'Mean Square Error', xlab = 'Model Size')
+points(which.min(mean.cv.errors), mean.cv.errors[which.min(mean.cv.errors)], 
+       col = 'red', cex = 2, pch = 20)
+
+```
+
+```{r}
+
+mean.cv.errors[which.min(mean.cv.errors)]
+
+```
+
+
+From this run of 10-fold CV with best subset selection, it appears that a least squares model of size 11 led to the smallest mean square error of 43.19. The last step will be to perform best subset selection on the full dataset to choose the best 11-variable model. 
+
+```{r}
+
+best11 = regsubsets(crim ~ ., data = Boston, nvmax = p)
+coef(best11, 11)
+
+```
+
+
+Next, we will see if ridge or lasso regression can improve upon the error of this problem using cross-validation to select the $\lambda$ parameter.
+
+```{r}
+
+x = model.matrix(crim ~ ., data = Boston)
+y = Boston$crim
+
+grid = 10^seq(10, -2, length = 100)
+
+bosRidge = cv.glmnet(x[bosTrain, ], Boston$crim[bosTrain], alpha = 0, lambda = grid)
+bosLasso = cv.glmnet(x[bosTrain, ], Boston$crim[bosTrain], alpha = 1, lambda = grid)
+
+plot(bosRidge)
+plot(bosLasso)
+
+bosRidgeLam = bosRidge$lambda.min
+bosLassoLam = bosLasso$lambda.min
+
+```
+
+```{r}
+
+bosRidgePred = predict(bosRidge, s = bosRidgeLam, newx = x[-bosTrain, ])
+bosLassoPred = predict(bosLasso, s = bosLassoLam, newx = x[-bosTrain, ])
+
+bosRidgeError = round(mean((bosRidgePred - y[-bosTrain])^2), 2)
+bosLassoError = round(mean((bosLassoPred - y[-bosTrain])^2), 2)
+
+```
+
+Below are the variables selected on this dataset by Ridge, as well as the mean squared error over 10-fold CV.
+
+```{r}
+
+predict(bosRidge, s = bosRidgeLam, type = 'coefficients')
+bosRidgeError
+
+```
+Below are the variables selected on this dataset by Lasso, as well as the mean squared error over 10-fold CV.
+
+```{r}
+
+predict(bosLasso, s = bosLassoLam, type = 'coefficients')
+bosLassoError
+
+```
+
+(b) Propose a model (or set of models) that seem to perform well on this data set, and justify your answer. Make sure that you are evaluating model performance using validation set error, cross validation, or some other reasonable alternative, as opposed to using training error.
+
+These have been included above in each of the code chunks. I should have read this question first. I would advocate for use of the ridge regression model. Typically, where all else is equal, I would advocate for the simplest model possible, but in the cases just evaluated, two of the three models excluded one variable, but not the same one. Best subset selection with least squares eliminated 'age' in the 11-variable model, and lasso eliminated 'chas'. This reduces my confidence that there is truly a variable worth excluding from a full model. In addition, these two models produced a greater cross-validation error than the lasso (trivially in the case of lasso, and appreciably in the case of least squares). 
+
+(c) Does your chosen model involve all of the features in the data set? Why or why not?
+
+Yes it does. Typically, I would be enthusiastic about eliminating predictors and advocating for the simplest model possible, but I do not feel that there is good enough evidence to make a case for the sparser models produced by least squares with best subsets or by the lasso in this case. They each eliminated different variables, and ridge regression produced the lowest (albeit trivial vs. lasso) test MSE of the group. 
+
+
+
+
+
+
+
+
+
+
+
+
